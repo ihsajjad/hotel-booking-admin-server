@@ -5,12 +5,12 @@ const { database } = require("./config");
 const {
   addDoc,
   collection,
-  setDoc,
   doc,
   getDoc,
   query,
   where,
   getDocs,
+  updateDoc,
 } = require("firebase/firestore");
 require("dotenv").config();
 const port = process.env.PORT || 5000;
@@ -37,7 +37,6 @@ app.get("/single-user/:email", async (req, res) => {
 
       // Get the user data from the document
       const userData = userDoc.data();
-      console.log(userDoc.id);
       userData.id = userDoc.id;
 
       // Respond with the user data
@@ -56,7 +55,6 @@ app.get("/single-user/:email", async (req, res) => {
 // Getting all bookings
 app.get("/all-bookings", async (req, res) => {
   const querySnapshot = await getDocs(bookingCollection);
-
   const list = querySnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
 
   res.status(200).json(list);
@@ -83,22 +81,17 @@ app.get("/my-bookings/:email", async (req, res) => {
 
   try {
     const querySnapshot = await getDocs(
-      query(bookingCollection, where("email", "==", email))
+      query(bookingCollection, where("guestEmail", "==", email))
     );
 
     if (!querySnapshot.empty) {
-      const userDoc = querySnapshot.docs[0];
-
-      // Get the user data from the document
-      const userData = userDoc.data();
-      userData.id = userDoc.id;
+      const list = querySnapshot?.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
 
       // Respond with the bookings of individual user
-      res.status(200).json(userData);
-    } else {
-      res
-        .status(404)
-        .json({ message: "No such document with the given email" });
+      res.status(200).json(list);
     }
   } catch (error) {
     console.error("Error getting document:", error);
@@ -110,33 +103,33 @@ app.get("/my-bookings/:email", async (req, res) => {
 app.post("/add-booking", async (req, res) => {
   const data = req.body;
 
-  const result = await addDoc(bookingCollection, data);
-});
-
-/* app.post("/add-user", async (req, res) => {
   try {
-    // Get user data from the request body
-    const userData = {
-      name: "Iftekher Hossen",
-      email: "iftekherhossensajjad@gmail.com",
-      role: "user",
-    };
-
-    // Add a new user document to the Firestore collection
-    const newUserRef = await addDoc(usersCollection, userData);
-
-    // Respond with the ID of the newly created user document
-    res
-      .status(201)
-      .json({ message: "User added successfully", id: newUserRef.id });
-  } catch (error) {
-    console.error("Error adding user:", error);
-    res.status(500).json({ message: "Internal server error" });
+    const result = await addDoc(bookingCollection, data);
+    res.status(200).send({ error: false, message: "added successfully" });
+  } catch (err) {
+    if (err) {
+      res.status(400).send({ error: true, message: "failed to add" });
+    }
   }
-}); */
+});
 
 app.get("/", async (req, res) => {
   res.send("Hotel booking admin is running");
+});
+
+// updating booking status and adding manager info
+app.post("/update-single-booking/:id", async (req, res) => {
+  const { id } = req.params;
+  const updated = req.body;
+
+  try {
+    const result = await updateDoc(doc(bookingCollection, id), updated);
+    if (result) {
+      res.status(200).send({ error: false, message: "update successfull" });
+    }
+  } catch (err) {
+    res.status(401).send({ error: true, message: "update failed" });
+  }
 });
 
 app.listen(port, () => {
